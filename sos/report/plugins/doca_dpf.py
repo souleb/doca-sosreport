@@ -115,14 +115,15 @@ class DocaDpf(Plugin):
                 break
 
     def check_is_master(self):
-        """ Check if this is the master node """
-        return any(self.path_exists(f) for f in self.files)
+        """Host-cluster kubectl when SOS_COLLECT_CLUSTER=1."""
+        return os.environ.get('SOS_COLLECT_CLUSTER') == '1'
 
     def setup(self):
         # Copy the specified configuration files
         self.add_copy_spec(self.config_files)
 
-        # We can only grab kubectl output from the master
+        # Host-cluster API dump: control-plane Jobs only
+        # (see SOS_COLLECT_CLUSTER).
         if not self.check_is_master():
             return
 
@@ -174,16 +175,24 @@ class DocaDpf(Plugin):
         Returns a list of dicts with cluster name, namespace, and
         kubeconfig secret name.
         """
-        result = self.collect_cmd_output(
+        result = self._collect_cmd_output(
             f"{self.kube_cmd} get dpucluster -A -o json",
-            subdir='cluster-info'
+            suggest_filename='dpucluster-list.json',
+            subdir='cluster-info',
+            to_file=True,
         )
 
         if result['status'] != 0:
             return []
 
+        json_path = result.get('filename')
+        if not json_path or not os.path.isfile(json_path):
+            self._log_error("dpucluster discovery produced no output file")
+            return []
+
         try:
-            data = json.loads(result['output'])
+            with open(json_path, encoding='utf-8') as fh:
+                data = json.load(fh)
             clusters = []
             for item in data.get('items', []):
                 cluster_name = item['metadata']['name']
