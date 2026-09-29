@@ -117,8 +117,9 @@ class DocaDpf(Plugin):
     def should_collect_cluster(self):
         """Whether to run host-cluster kubectl.
 
-        If SOS_COLLECT_CLUSTER is set (dpfctl Jobs), honor exact '1'.
-        If unset (manual runs), fall back to kubeconfig path presence.
+        SOS_COLLECT_CLUSTER is set by the caller to force (1) or skip (0)
+        host-cluster kubectl collection; unset falls back to kubeconfig
+        presence.
         """
         env = os.environ.get('SOS_COLLECT_CLUSTER')
         if env is not None:
@@ -129,8 +130,8 @@ class DocaDpf(Plugin):
         # Copy the specified configuration files
         self.add_copy_spec(self.config_files)
 
-        # Host-cluster API dump when SOS_COLLECT_CLUSTER=1, or when
-        # unset and a kubeconfig path from self.files exists.
+        # SOS_COLLECT_CLUSTER: caller sets 1 to force or 0 to skip
+        # host-cluster kubectl; unset falls back to kubeconfig presence.
         if not self.should_collect_cluster():
             return
 
