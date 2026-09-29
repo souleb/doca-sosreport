@@ -36,11 +36,12 @@ class GatePlugin(DocaDpf):
 
     def __init__(self, commons):
         self.path_checks = []
+        self._path_exists_result = True
         super().__init__(commons)
 
     def path_exists(self, path):
         self.path_checks.append(path)
-        return True
+        return self._path_exists_result
 
 
 class DocaDpfMasterGateTests(unittest.TestCase):
@@ -61,20 +62,39 @@ class DocaDpfMasterGateTests(unittest.TestCase):
         else:
             os.environ['SOS_COLLECT_CLUSTER'] = self._saved_env
 
-    def test_admin_conf_does_not_imply_master(self):
+    def test_unset_env_admin_conf_present(self):
         self.plugin.path_checks = []
+        self.plugin._path_exists_result = True
         self.assertIn('/etc/kubernetes/admin.conf', self.plugin.files)
-        self.assertFalse(self.plugin.check_is_master())
+        self.assertTrue(self.plugin.should_collect_cluster())
+        self.assertEqual(self.plugin.path_checks, [
+            '/etc/kubernetes/admin.conf'
+        ])
+
+    def test_unset_env_admin_conf_absent(self):
+        self.plugin.path_checks = []
+        self.plugin._path_exists_result = False
+        self.assertFalse(self.plugin.should_collect_cluster())
+        self.assertEqual(self.plugin.path_checks, [
+            '/etc/kubernetes/admin.conf'
+        ])
+
+    def test_env_zero_disables_even_with_admin_conf(self):
+        os.environ['SOS_COLLECT_CLUSTER'] = '0'
+        self.plugin.path_checks = []
+        self.plugin._path_exists_result = True
+        self.assertFalse(self.plugin.should_collect_cluster())
         self.assertEqual(self.plugin.path_checks, [])
 
-    def test_only_exact_env_enables_master(self):
-        for value in ('', '0', 'true', 'yes'):
-            os.environ['SOS_COLLECT_CLUSTER'] = value
-            self.assertFalse(self.plugin.check_is_master())
+    def test_env_one_enables_cluster_collect(self):
         os.environ['SOS_COLLECT_CLUSTER'] = '1'
-        self.assertTrue(self.plugin.check_is_master())
+        self.plugin.path_checks = []
+        self.plugin._path_exists_result = False
+        self.assertTrue(self.plugin.should_collect_cluster())
+        self.assertEqual(self.plugin.path_checks, [])
 
-    def test_setup_skips_cluster_dump_without_env(self):
+    def test_setup_skips_cluster_dump_when_env_zero(self):
+        os.environ['SOS_COLLECT_CLUSTER'] = '0'
         self.plugin.collect_per_resource_details = MagicMock()
         self.plugin._collect_all_dpu_clusters = MagicMock()
         self.plugin.setup()

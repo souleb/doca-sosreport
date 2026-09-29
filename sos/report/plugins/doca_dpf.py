@@ -114,17 +114,24 @@ class DocaDpf(Plugin):
                 self.kube_cmd += f" --kubeconfig={_kconf}"
                 break
 
-    def check_is_master(self):
-        """Host-cluster kubectl when SOS_COLLECT_CLUSTER=1."""
-        return os.environ.get('SOS_COLLECT_CLUSTER') == '1'
+    def should_collect_cluster(self):
+        """Whether to run host-cluster kubectl.
+
+        If SOS_COLLECT_CLUSTER is set (dpfctl Jobs), honor exact '1'.
+        If unset (manual runs), fall back to kubeconfig path presence.
+        """
+        env = os.environ.get('SOS_COLLECT_CLUSTER')
+        if env is not None:
+            return env == '1'
+        return any(self.path_exists(f) for f in self.files)
 
     def setup(self):
         # Copy the specified configuration files
         self.add_copy_spec(self.config_files)
 
-        # Host-cluster API dump: control-plane Jobs only
-        # (see SOS_COLLECT_CLUSTER).
-        if not self.check_is_master():
+        # Host-cluster API dump when SOS_COLLECT_CLUSTER=1, or when
+        # unset and a kubeconfig path from self.files exists.
+        if not self.should_collect_cluster():
             return
 
         # Collect host cluster resources
