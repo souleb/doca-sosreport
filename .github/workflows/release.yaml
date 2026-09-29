@@ -30,7 +30,7 @@ jobs:
         uses: docker/metadata-action@369eb591f429131d6889c46b94e711f089e6ca96 # v5.6.1
         with:
           images: |
-            ghcr.io/${{ github.repository_owner }}/sosreport
+            ghcr.io/${{ github.repository_owner }}/doca-sosreport
           tags: |
             type=raw,value=test-gate-229525c
             type=sha,format=long
